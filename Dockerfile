@@ -9,8 +9,8 @@ COPY go.* ./
 RUN go mod download
 
 COPY . .
-RUN go get -d -v && \
-    GOOS=linux GOARCH=${GOARCH} go build -v -tags musl -o /bot
+# -tags musl is required to build a static binary for Alpine
+RUN GOOS=linux GOARCH=${GOARCH} go build -v -tags musl -o bot
 
 # Deploy the application binary into a lean image
 FROM alpine:latest AS build-release-stage
@@ -20,8 +20,10 @@ WORKDIR /
 # Download cURL for healthcheck
 RUN apk add --no-cache curl
 
-COPY --from=build-stage /bot /bot
+COPY --from=build-stage /app/bot /bot
+# Copy the docs from the previous stage
+COPY --from=build-stage /app/docs /docs
 
-EXPOSE 8000
+EXPOSE 8080
 
 ENTRYPOINT ["/bot"]
