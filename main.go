@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -12,6 +13,12 @@ import (
 	"github.com/Rowentey/teybot/src/worker"
 	"github.com/go-telegram/bot"
 	"github.com/joho/godotenv"
+	httpSwagger "github.com/swaggo/http-swagger"
+)
+
+const (
+	PORT        = "8080"
+	SWAGGER_URL = "swagger.yaml"
 )
 
 func main() {
@@ -52,28 +59,38 @@ func main() {
 		controller.WebhookHandler(w, r, b)
 	})
 	controller.RegisterCronHandlers(cronWorker)
+
+	// Swagger setup
+	http.HandleFunc(fmt.Sprintf("GET /%s", SWAGGER_URL), func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./docs/openapi.yaml")
+	})
+	http.HandleFunc("GET /docs/", httpSwagger.Handler(
+		httpSwagger.URL(fmt.Sprintf("http://localhost:%s/%s", PORT, SWAGGER_URL)),
+	))
+
+	// Telegram handlers
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/start", bot.MatchTypeExact, controller.StartHandler)
 
 	// Create HTTP server
 	srv := &http.Server{
-		Addr:    ":8080",
+		Addr:    fmt.Sprintf(":%s", PORT),
 		Handler: nil,
 	}
 
 	// Start HTTP server in goroutine
 	serverErr := make(chan error, 1)
 	go func() {
-		log.Println("Starting HTTP server on :8080...")
+		log.Printf("Starting HTTP server on :%s...\n", PORT)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			serverErr <- err
 		}
 	}()
 
 	// Start bot in goroutine
-	go func() {
-		log.Println("Bot starting...")
-		b.Start(ctx)
-	}()
+	// go func() {
+	// 	log.Println("Bot starting...")
+	// 	b.Start(ctx)
+	// }()
 
 	// Wait for either:
 	// 1. An interrupt signal (ctx.Done())

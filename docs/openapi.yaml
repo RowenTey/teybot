@@ -1,0 +1,238 @@
+openapi: 3.0.0
+info:
+  title: TeyBot API
+  description: API for managing Telegram bot and scheduled messages.
+  version: 1.0.0
+servers:
+  - url: https://teybot-api.rowentey.xyz
+    description: Production
+
+paths:
+  /webhook:
+    post:
+      tags:
+        - Webhook
+      summary: Send a message via webhook
+      description: Send a message to a specified Telegram chat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageRequest"
+      responses:
+        "200":
+          description: Message sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+        "400":
+          description: Invalid request
+        "500":
+          description: Failed to send message
+
+  /schedules:
+    get:
+      tags:
+        - Schedules
+      summary: Get all schedules
+      description: Retrieve all scheduled messages
+      responses:
+        "200":
+          description: List of scheduled messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScheduledMessage"
+    post:
+      tags:
+        - Schedules
+      summary: Create a new schedule
+      description: Add a new scheduled message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScheduleRequest"
+      responses:
+        "200":
+          description: Schedule created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Schedule created
+                  id:
+                    type: string
+                    example: 1d80439f-74c9-4367-8c2c-e18e7c353645
+        "400":
+          description: Invalid request body or schedule configuration
+
+  /schedules/{id}:
+    get:
+      tags:
+        - Schedules
+      summary: Get a specific schedule
+      description: Retrieve details of a single scheduled message
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Schedule details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledMessage"
+        "404":
+          description: Schedule not found
+    put:
+      tags:
+        - Schedules
+      summary: Update a schedule
+      description: Modify an existing scheduled message
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScheduleRequest"
+      responses:
+        "200":
+          description: Schedule updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Schedule updated
+        "400":
+          description: Invalid request body or schedule configuration
+        "404":
+          description: Schedule not found
+    delete:
+      tags:
+        - Schedules
+      summary: Delete a schedule
+      description: Remove a scheduled message
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Schedule deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Schedule deleted
+        "404":
+          description: Schedule not found
+
+components:
+  schemas:
+    MessageRequest:
+      type: object
+      properties:
+        chat_id:
+          type: integer
+          format: int64
+          description: Telegram chat ID
+          example: -1002500967655
+        message_thread_id:
+          type: integer
+          description: Telegram message thread ID (optional)
+          example: 49
+        text:
+          type: string
+          description: Message content
+          example: Hello from the API!
+      required:
+        - chat_id
+        - text
+
+    ScheduleRequest:
+      type: object
+      properties:
+        chat_id:
+          type: integer
+          format: int64
+          description: Telegram chat ID
+          example: -1002500967655
+        message_thread_id:
+          type: integer
+          description: Telegram message thread ID (optional)
+          example: 49
+        message:
+          type: string
+          description: Message content (ignored if task_name is provided)
+          example: Daily reminder
+        cron_expr:
+          type: string
+          description: Cron expression for scheduling
+          example: "0 9 * * *"
+        description:
+          type: string
+          description: Human-readable description
+          example: Daily 9AM reminder
+        enabled:
+          type: boolean
+          description: Whether the schedule is active
+          example: true
+        task_name:
+          type: string
+          description: Name of predefined task (optional)
+          example: SGD_TO_MYR
+      required:
+        - chat_id
+        - cron_expr
+        - enabled
+
+    ScheduledMessage:
+      allOf:
+        - $ref: "#/components/schemas/ScheduleRequest"
+        - type: object
+          properties:
+            id:
+              type: string
+              description: Unique identifier
+              example: 1d80439f-74c9-4367-8c2c-e18e7c353645
+          required:
+            - id
