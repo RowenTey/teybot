@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 	"sync"
 	"time"
 
-	"slices"
+	// Import tzdata to ensure timezone data is loaded
+	_ "time/tzdata"
 
 	"github.com/Rowentey/teybot/model"
 	"github.com/Rowentey/teybot/util"
