@@ -8,8 +8,8 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/Rowentey/teybot/controller"
-	"github.com/Rowentey/teybot/worker"
+	"github.com/Rowentey/teybot/src/controller"
+	"github.com/Rowentey/teybot/src/worker"
 	"github.com/go-telegram/bot"
 	"github.com/joho/godotenv"
 )

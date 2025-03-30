@@ -5,8 +5,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/Rowentey/teybot/model"
-	"github.com/Rowentey/teybot/worker"
+	"github.com/Rowentey/teybot/src/model"
+	"github.com/Rowentey/teybot/src/worker"
 	"github.com/google/uuid"
 )
 

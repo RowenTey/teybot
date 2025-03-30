@@ -13,8 +13,8 @@ import (
 	// Import tzdata to ensure timezone data is loaded
 	_ "time/tzdata"
 
-	"github.com/Rowentey/teybot/model"
-	"github.com/Rowentey/teybot/util"
+	"github.com/Rowentey/teybot/src/model"
+	"github.com/Rowentey/teybot/src/util"
 	"github.com/go-co-op/gocron/v2"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"

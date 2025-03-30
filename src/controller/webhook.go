@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/Rowentey/teybot/model"
+	"github.com/Rowentey/teybot/src/model"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 )
