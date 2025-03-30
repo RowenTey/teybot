@@ -88,6 +88,12 @@ jobs:
     needs:
       - build
     steps:
+      # transform RowenTey/teybot into rowentey/teybot
+      - name: Prepare REPOSITORY
+        run: |
+          repo=${{ github.repository }}
+          echo "REPOSITORY=${repo,,}" >> $GITHUB_ENV
+
       - name: Download digests
         uses: actions/download-artifact@v4
         with:
