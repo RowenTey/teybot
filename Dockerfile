@@ -3,12 +3,14 @@ FROM golang:1.23-alpine AS build-stage
 
 WORKDIR /app
 
+ARG GOARCH=amd64
+
 COPY go.* ./
 RUN go mod download
 
 COPY . .
 RUN go get -d -v && \
-    GOOS=linux GOARCH=amd64 go build -v -tags musl -o /bot
+    GOOS=linux GOARCH=${GOARCH} go build -v -tags musl -o /bot
 
 # Deploy the application binary into a lean image
 FROM alpine:latest AS build-release-stage
