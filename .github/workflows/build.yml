@@ -42,7 +42,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}/bot
+          images: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
           tags: |
             type=sha
             latest
@@ -60,7 +60,8 @@ jobs:
           build-args: |
             GOARCH=${{ env.ARCH }}
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
@@ -103,7 +104,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}/bot
+          images: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
           tags: |
             type=sha
             latest
