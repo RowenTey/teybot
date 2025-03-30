@@ -15,14 +15,6 @@ func StartHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 		Text: fmt.Sprintf(
 			"Hello, %s! I am Tey's Personal Bot, please contact @Kai_Seong for further enquiries.", update.Message.From.Username),
 	})
-
-	// msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
-	// 	ChatID: -1002500967655,
-	// 	Text:   "I am a bot that echoes your messages. Try sending me a message!",
-	// 	ReplyParameters: &models.ReplyParameters{
-	// 		MessageID: 1,
-	// 	},
-	// })
 }
 
 func Handler(ctx context.Context, b *bot.Bot, update *models.Update) {
