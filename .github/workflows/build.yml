@@ -68,6 +68,9 @@ jobs:
           # see https://github.com/docker/build-push-action/discussions/1213
           tags: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+          # cache layers in Github Actions Cache to speed up builds
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Export digest
         run: |
