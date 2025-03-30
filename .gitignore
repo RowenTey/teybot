@@ -1,2 +1,4 @@
 *.env
 cron_config.json
+channels.md
+docker-compose.yml
