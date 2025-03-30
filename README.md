@@ -1,6 +1,6 @@
 # TeyBot 🤖
 
-> Personalized telegram bot for miscellaneous tasks with lightweight HTTP server and CRON worker in Go
+> Personalized telegram bot for miscellaneous tasks with lightweight HTTP server and CRON worker in Go.
 
 ## 🛠 Getting Started
 
@@ -19,7 +19,7 @@ cp .env.example .env
 3\. Run application in `dev` mode
 
 > [!WARNING]  
-> Only 1 instance of the telegram bot can be run at any moment
+> Only **1 instance** of the telegram bot can be ran at any moment.
 
 ```terminal
 go run main.go dev
@@ -55,4 +55,4 @@ To define your own tasks, create a function in `src/util/` and add it to **TaskM
 
 ## 📚 Docs
 
-API docs are served at `/docs` endpoint
+API docs are served at `/docs` endpoint.
