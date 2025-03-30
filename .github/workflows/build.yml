@@ -42,7 +42,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
+          images: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}/bot
           tags: |
             type=sha
             latest
@@ -103,7 +103,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
+          images: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}/bot
           tags: |
             type=sha
             latest
