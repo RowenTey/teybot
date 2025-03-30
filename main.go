@@ -87,10 +87,10 @@ func main() {
 	}()
 
 	// Start bot in goroutine
-	// go func() {
-	// 	log.Println("Bot starting...")
-	// 	b.Start(ctx)
-	// }()
+	go func() {
+		log.Println("Bot starting...")
+		b.Start(ctx)
+	}()
 
 	// Wait for either:
 	// 1. An interrupt signal (ctx.Done())
