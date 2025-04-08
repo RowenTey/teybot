@@ -65,7 +65,7 @@ func main() {
 		http.ServeFile(w, r, "./docs/openapi.yaml")
 	})
 	http.HandleFunc("GET /docs/", httpSwagger.Handler(
-		httpSwagger.URL(fmt.Sprintf("http://localhost:%s/%s", PORT, SWAGGER_URL)),
+		httpSwagger.URL(fmt.Sprintf("/%s", SWAGGER_URL)),
 	))
 
 	// Telegram handlers
