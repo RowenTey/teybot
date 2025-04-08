@@ -1,0 +1,63 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+
+env:
+  DEST_FILEPATH: ~/codebase/teybot
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: Production
+      url: https://teybot-api.rowentey.xyz/
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # only checkout the docker compose file
+          sparse-checkout: |
+            docker-compose.yml
+          sparse-checkout-cone-mode: false
+
+      # Create the .env file to use with docker-compose
+      - name: Create .env file
+        run: |
+          cat << EOF > .env
+            BOT_TOKEN=${{ secrets.BOT_TOKEN }}
+            EXCHANGE_RATE_API_KEY=${{ secrets.EXCHANGE_RATE_API_KEY }}
+            FINNHUB_API_KEY=${{ secrets.FINNHUB_API_KEY }}
+          EOF
+
+      # Transfer files to the server
+      - name: Transfer files to staging server
+        uses: RowenTey/cloudflared-scp-action@v1.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          private_key: ${{ secrets.SSH_PRIVATE_KEY_VALUE }}
+          port: ${{ secrets.SSH_PORT }}
+          from: |
+            ./docker-compose.yml
+            ./.env
+          to: ${{ env.DEST_FILEPATH }}/
+          service_token_id: ${{ secrets.SERVICE_TOKEN_ID }}
+          service_token_secret: ${{ secrets.SERVICE_TOKEN_SECRET }}
+
+      - name: Deploy
+        uses: and-fm/cloudflared-ssh-action@v3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          private_key_value: ${{ secrets.SSH_PRIVATE_KEY_VALUE }}
+          private_key_filename: ${{ secrets.SSH_PRIVATE_KEY_FILENAME }}
+          port: ${{ secrets.SSH_PORT }}
+          service_token_id: ${{ secrets.SERVICE_TOKEN_ID }}
+          service_token_secret: ${{ secrets.SERVICE_TOKEN_SECRET }}
+          commands: |
+            cd ${{ env.DEST_FILEPATH }}
+            docker compose pull
+            docker compose down -v
+            docker compose up -d
+            docker image prune -f
