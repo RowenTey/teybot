@@ -17,103 +17,150 @@ import (
 )
 
 const (
-	PORT        = "8080"
-	SWAGGER_URL = "swagger.yaml"
+	port        = "8080"
+	swaggerFile = "swagger.yaml"
 )
 
 func main() {
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer cancel()
+	// Setup context with interrupt handling
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
 
-	// Environment setup
-	env := ""
-	if len(os.Args) > 1 {
-		env = os.Args[1]
+	// Load environment variables
+	if err := loadEnv(); err != nil {
+		log.Fatalf("Failed to load environment variables: %v", err)
 	}
-	if env == "dev" {
+
+	// Initialize Telegram bot
+	botClient, err := initBot()
+	if err != nil {
+		log.Fatalf("Failed to initialize bot: %v", err)
+	}
+
+	// Setup cron worker
+	cronWorker := worker.NewCronWorker(botClient, "cron_config.json")
+	startCronWorker(cronWorker)
+	defer cronWorker.Stop()
+
+	// Setup HTTP server
+	srv := setupHTTPServer(botClient, cronWorker)
+
+	// Start server and bot
+	if err := startServices(ctx, srv, botClient); err != nil {
+		log.Fatalf("Service startup failed: %v", err)
+	}
+
+	// Graceful shutdown
+	waitForShutdown(ctx, srv)
+	log.Println("Shutdown complete")
+}
+
+// loadEnv loads .env file only in dev mode
+func loadEnv() error {
+	if len(os.Args) > 1 && os.Args[1] == "dev" {
 		log.Println("Loading .env file...")
-		if err := godotenv.Load(".env"); err != nil {
-			log.Fatal("Error loading .env file")
-		}
+		return godotenv.Load()
 	}
+	return nil
+}
 
-	// Initialize bot
+// initBot creates and configures the Telegram bot
+func initBot() (*bot.Bot, error) {
 	opts := []bot.Option{
 		bot.WithDefaultHandler(controller.Handler),
 		bot.WithCheckInitTimeout(10 * time.Second),
 	}
+
 	b, err := bot.New(os.Getenv("BOT_TOKEN"), opts...)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("bot initialization failed: %w", err)
 	}
-	log.Println("Bot created")
 
-	// Initialize cron worker with context
-	log.Println("Creating cron worker")
-	cronWorker := worker.NewCronWorker(b, "cron_config.json")
-	go cronWorker.Start()
-	defer cronWorker.Stop()
-
-	// Register handlers
-	http.HandleFunc("/webhook", func(w http.ResponseWriter, r *http.Request) {
-		controller.WebhookHandler(w, r, b)
-	})
-	controller.RegisterCronHandlers(cronWorker)
-
-	// Swagger setup
-	http.HandleFunc(fmt.Sprintf("GET /%s", SWAGGER_URL), func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./docs/openapi.yaml")
-	})
-	http.HandleFunc("GET /docs/", httpSwagger.Handler(
-		httpSwagger.URL(fmt.Sprintf("/%s", SWAGGER_URL)),
-	))
-
-	// Telegram handlers
+	// Register command handlers
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/start", bot.MatchTypeExact, controller.StartHandler)
 
-	// Create HTTP server
+	log.Println("Bot initialized")
+	return b, nil
+}
+
+// startCronWorker starts the cron worker in a goroutine
+func startCronWorker(cronWorker *worker.CronWorker) {
+	go func() {
+		log.Println("Starting cron worker...")
+		cronWorker.Start()
+	}()
+}
+
+// setupHTTPServer configures all HTTP routes and returns the server
+func setupHTTPServer(b *bot.Bot, cronWorker *worker.CronWorker) *http.Server {
+	mux := http.NewServeMux()
+
+	// Webhook
+	mux.HandleFunc("/webhook", func(w http.ResponseWriter, r *http.Request) {
+		controller.WebhookHandler(w, r, b)
+	})
+
+	// Swagger
+	mux.HandleFunc(fmt.Sprintf("GET /%s", swaggerFile), func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./docs/openapi.yaml")
+	})
+	mux.HandleFunc("GET /docs/", httpSwagger.Handler(
+		httpSwagger.URL(fmt.Sprintf("/%s", swaggerFile)),
+	))
+
+	// Register cron HTTP handlers
+	controller.RegisterCronHandlers(cronWorker)
+
 	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%s", PORT),
-		Handler: nil,
+		Addr:    ":" + port,
+		Handler: mux,
 	}
 
-	// Start HTTP server in goroutine
-	serverErr := make(chan error, 1)
+	return srv
+}
+
+// startServices runs HTTP server and Telegram bot concurrently
+func startServices(ctx context.Context, srv *http.Server, b *bot.Bot) error {
+	errChan := make(chan error, 2)
+
+	// Start HTTP server
 	go func() {
-		log.Printf("Starting HTTP server on :%s...\n", PORT)
+		log.Printf("Starting HTTP server on :%s\n", port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			serverErr <- err
+			errChan <- fmt.Errorf("http server error: %w", err)
 		}
 	}()
 
-	// Start bot in goroutine
+	// Start Telegram bot
 	go func() {
-		log.Println("Bot starting...")
+		log.Println("Starting Telegram bot...")
 		b.Start(ctx)
 	}()
 
-	// Wait for either:
-	// 1. An interrupt signal (ctx.Done())
-	// 2. An error from the server or bot
+	// Wait for either context cancellation or error
 	select {
 	case <-ctx.Done():
-		log.Println("Received interrupt signal, shutting down...")
-	case err := <-serverErr:
-		log.Printf("HTTP server error: %v\n", err)
-		// Trigger shutdown of other components
-		cancel()
+		log.Println("Received shutdown signal")
+	case err := <-errChan:
+		return err
 	}
 
-	// Graceful shutdown
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer shutdownCancel()
+	return nil
+}
 
-	// Shutdown HTTP server
+// waitForShutdown performs graceful shutdown
+func waitForShutdown(ctx context.Context, srv *http.Server) {
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("HTTP server shutdown error: %v", err)
+		log.Printf("HTTP server forced to shutdown: %v", err)
+	} else {
+		log.Println("HTTP server stopped gracefully")
 	}
 
-	// Bot will stop automatically when its context is cancelled
-	// Cron worker will stop via defer
-	log.Println("Shutdown complete")
+	<-shutdownCtx.Done()
+	if shutdownCtx.Err() == context.DeadlineExceeded {
+		log.Println("Shutdown timeout exceeded")
+	}
 }

@@ -78,8 +78,11 @@ func (w *CronWorker) Start() {
 
 // Stop halts the cron scheduler
 func (w *CronWorker) Stop() {
-	w.scheduler.Shutdown()
-	log.Println("Cron worker stopped")
+	if err := w.scheduler.Shutdown(); err != nil {
+		log.Printf("Error stopping cron scheduler: %v", err)
+	} else {
+		log.Println("Cron worker stopped")
+	}
 }
 
 // SaveConfig writes the current schedules to the config file
