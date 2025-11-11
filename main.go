@@ -26,31 +26,25 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	// Load environment variables
 	if err := loadEnv(); err != nil {
 		log.Fatalf("Failed to load environment variables: %v", err)
 	}
 
-	// Initialize Telegram bot
 	botClient, err := initBot()
 	if err != nil {
 		log.Fatalf("Failed to initialize bot: %v", err)
 	}
 
-	// Setup cron worker
 	cronWorker := worker.NewCronWorker(botClient, "cron_config.json")
 	startCronWorker(cronWorker)
 	defer cronWorker.Stop()
 
-	// Setup HTTP server
 	srv := setupHTTPServer(botClient, cronWorker)
 
-	// Start server and bot
 	if err := startServices(ctx, srv, botClient); err != nil {
 		log.Fatalf("Service startup failed: %v", err)
 	}
 
-	// Graceful shutdown
 	waitForShutdown(ctx, srv)
 	log.Println("Shutdown complete")
 }
@@ -76,7 +70,6 @@ func initBot() (*bot.Bot, error) {
 		return nil, fmt.Errorf("bot initialization failed: %w", err)
 	}
 
-	// Register command handlers
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/start", bot.MatchTypeExact, controller.StartHandler)
 
 	log.Println("Bot initialized")
@@ -95,12 +88,10 @@ func startCronWorker(cronWorker *worker.CronWorker) {
 func setupHTTPServer(b *bot.Bot, cronWorker *worker.CronWorker) *http.Server {
 	mux := http.NewServeMux()
 
-	// Webhook
 	mux.HandleFunc("/webhook", func(w http.ResponseWriter, r *http.Request) {
 		controller.WebhookHandler(w, r, b)
 	})
 
-	// Swagger
 	mux.HandleFunc(fmt.Sprintf("GET /%s", swaggerFile), func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./docs/openapi.yaml")
 	})
@@ -108,7 +99,6 @@ func setupHTTPServer(b *bot.Bot, cronWorker *worker.CronWorker) *http.Server {
 		httpSwagger.URL(fmt.Sprintf("/%s", swaggerFile)),
 	))
 
-	// Register cron HTTP handlers
 	controller.RegisterCronHandlers(cronWorker)
 
 	srv := &http.Server{

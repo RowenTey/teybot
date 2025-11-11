@@ -4,7 +4,7 @@ info:
   description: API for managing Telegram bot and scheduled messages.
   version: 1.0.0
   contact:
-    name: Author
+    name: Rowen
     email: me@rowentey.xyz
 
 servers:
@@ -23,7 +23,7 @@ paths:
       tags:
         - Webhook
       summary: Send a message via webhook
-      description: Send a message to a specified Telegram chat
+      description: Send a formatted message with title and body to a specified Telegram chat
       requestBody:
         required: true
         content:
@@ -33,18 +33,10 @@ paths:
       responses:
         "200":
           description: Message sent successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: success
         "400":
-          description: Invalid request
+          description: Invalid request (missing fields or bad format)
         "500":
-          description: Failed to send message
+          description: Failed to send message to Telegram
 
   /schedules:
     get:
@@ -61,6 +53,7 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/ScheduledMessage"
+
     post:
       tags:
         - Schedules
@@ -89,8 +82,12 @@ paths:
                   id:
                     type: string
                     example: 1d80439f-74c9-4367-8c2c-e18e7c353645
+                required:
+                  - status
+                  - message
+                  - id
         "400":
-          description: Invalid request body or schedule configuration
+          description: Invalid request body or cron expression
 
   /schedules/{id}:
     get:
@@ -113,6 +110,7 @@ paths:
                 $ref: "#/components/schemas/ScheduledMessage"
         "404":
           description: Schedule not found
+
     put:
       tags:
         - Schedules
@@ -144,10 +142,14 @@ paths:
                   message:
                     type: string
                     example: Schedule updated
+                required:
+                  - status
+                  - message
         "400":
-          description: Invalid request body or schedule configuration
+          description: Invalid request body or cron expression
         "404":
           description: Schedule not found
+
     delete:
       tags:
         - Schedules
@@ -173,6 +175,9 @@ paths:
                   message:
                     type: string
                     example: Schedule deleted
+                required:
+                  - status
+                  - message
         "404":
           description: Schedule not found
 
@@ -184,19 +189,25 @@ components:
         chat_id:
           type: integer
           format: int64
-          description: Telegram chat ID
+          description: Telegram chat ID (group, supergroup, or channel)
           example: -1002500967655
         message_thread_id:
           type: integer
-          description: Telegram message thread ID (optional)
+          format: int64
+          description: Topic/thread ID in forums (supergroups with topics enabled)
           example: 49
-        text:
+        title:
           type: string
-          description: Message content
-          example: Hello from the API!
+          description: Bold title of the message
+          example: "System Alert"
+        message:
+          type: string
+          description: Main message body (supports newlines)
+          example: "Database backup completed successfully.\nNext backup: 9:00 AM tomorrow."
       required:
         - chat_id
-        - text
+        - title
+        - message
 
     ScheduleRequest:
       type: object
@@ -208,32 +219,34 @@ components:
           example: -1002500967655
         message_thread_id:
           type: integer
+          format: int64
           description: Telegram message thread ID (optional)
           example: 49
         message:
           type: string
-          description: Message content (ignored if task_name is provided)
-          example: Daily reminder
+          description: Message content (used if task_name is not provided)
+          example: "Daily market update"
         cron_expr:
           type: string
-          description: Cron expression for scheduling
+          description: Cron expression (minute hour day month day-of-week)
           example: "0 9 * * *"
         description:
           type: string
-          description: Human-readable description
-          example: Daily 9AM reminder
+          description: Human-readable description of the schedule
+          example: "Daily 9 AM reminder"
         enabled:
           type: boolean
           description: Whether the schedule is active
           example: true
         task_name:
           type: string
-          description: Name of predefined task (optional)
-          example: SGD_TO_MYR
+          description: Predefined task name (e.g., currency conversion, weather)
+          example: "SGD_TO_MYR"
       required:
         - chat_id
         - cron_expr
         - enabled
+        - task_name
 
     ScheduledMessage:
       allOf:
@@ -242,7 +255,7 @@ components:
           properties:
             id:
               type: string
-              description: Unique identifier
+              description: Unique identifier for the schedule
               example: 1d80439f-74c9-4367-8c2c-e18e7c353645
           required:
             - id
