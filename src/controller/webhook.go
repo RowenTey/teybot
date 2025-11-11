@@ -2,6 +2,7 @@ package controller
 
 import (
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 
@@ -17,9 +18,22 @@ func WebhookHandler(w http.ResponseWriter, r *http.Request, b *bot.Bot) {
 		return
 	}
 
-	// Parse JSON request
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("Failed to read request body: %v", err)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	const maxLog = 1024
+	if len(body) > maxLog {
+		log.Printf("Debug body (truncated %d bytes): %s...", len(body), string(body[:maxLog]))
+	} else {
+		log.Printf("Debug body: %s", string(body))
+	}
+
 	var msgReq model.MessageRequest
-	if err := json.NewDecoder(r.Body).Decode(&msgReq); err != nil {
+	if err := json.Unmarshal(body, &msgReq); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -42,15 +56,11 @@ func WebhookHandler(w http.ResponseWriter, r *http.Request, b *bot.Bot) {
 	}
 
 	// Send message using the bot
-	_, err := b.SendMessage(r.Context(), params)
-	if err != nil {
+	if _, err := b.SendMessage(r.Context(), params); err != nil {
 		log.Printf("Error sending message: %v", err)
 		http.Error(w, "Failed to send message", http.StatusInternalServerError)
 		return
 	}
 
-	// Response
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 }
