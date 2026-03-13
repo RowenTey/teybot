@@ -1,0 +1,15 @@
+name = "teybot"
+main = "src/index.ts"
+compatibility_date = "2026-03-13"
+
+[vars]
+SCHEDULE_TIMEZONE = "Asia/Singapore"
+
+[[d1_databases]]
+binding = "SCHEDULE_DB"
+database_name = "teybot"
+database_id = "09eeaa21-cf38-4beb-a064-31d5ae0883c8"
+migrations_dir = "migrations"
+
+[triggers]
+crons = ["* * * * *"]
