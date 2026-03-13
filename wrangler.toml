@@ -11,5 +11,9 @@ database_name = "teybot"
 database_id = "09eeaa21-cf38-4beb-a064-31d5ae0883c8"
 migrations_dir = "migrations"
 
+[[routes]]
+pattern = "teybot.rowentey.xyz"
+custom_domain = true
+
 [triggers]
 crons = ["* * * * *"]
