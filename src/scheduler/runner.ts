@@ -18,7 +18,7 @@ export async function runScheduledDispatch(env: Env, now: Date): Promise<void> {
 	const schedules = await getEnabledSchedules(env);
 	const { bot } = getBotAndHandler(env);
 	console.log(
-		`[schedule] checking ${schedules.length} schedules for ${now.toISOString()} in timezone ${timezone}`,
+		`[scheduler] Checking ${schedules.length} schedules for ${now.toISOString()} in timezone ${timezone}`,
 	);
 
 	for (const schedule of schedules) {
@@ -36,7 +36,7 @@ export async function runScheduledDispatch(env: Env, now: Date): Promise<void> {
 				message_thread_id: schedule.message_thread_id,
 			});
 		} catch (error) {
-			console.error("[schedule] failed", {
+			console.error("[scheduler] Failed to send scheduled message", {
 				schedule_id: schedule.id,
 				error,
 			});
