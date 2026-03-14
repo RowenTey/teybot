@@ -41,6 +41,11 @@ export async function handleWebhookSend(
 		return jsonResponse(400, { error: "Missing required field: message" });
 	}
 
+	console.log("Received webhook message request", {
+		chat_id: payload.chat_id,
+		title: payload.title,
+		message: payload.message,
+	});
 	const { bot } = getBotAndHandler(env);
 	const text = `*${escapeMarkdownV2(payload.title)}*\n\n${escapeMarkdownV2(payload.message)}`;
 
@@ -49,7 +54,8 @@ export async function handleWebhookSend(
 			parse_mode: "MarkdownV2",
 			message_thread_id: payload.message_thread_id,
 		});
-	} catch {
+	} catch (error) {
+		console.error("Failed to send message to Telegram", error);
 		return jsonResponse(500, { error: "Failed to send message" });
 	}
 
