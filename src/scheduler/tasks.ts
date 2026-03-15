@@ -8,11 +8,21 @@ interface StockPriceResponse {
 	c?: number;
 }
 
+interface KkDailyQuotaItem {
+	date: string;
+	available_quota: number;
+	max_quota: number;
+	current_booking_value: number;
+	product_id: number;
+	id: number;
+}
+
 export type TaskHandler = (env: Env) => Promise<string>;
 
 export const TaskMap: Record<string, TaskHandler> = {
 	SGD_TO_MYR: getExchangeRate,
 	TSLA_PRICE: getTSLAPrice,
+	KK_DAILY_QUOTA_AVAILABILITY: getKkDailyQuotaAvailability,
 };
 
 export async function getExchangeRate(env: Env): Promise<string> {
@@ -63,5 +73,85 @@ export async function getTSLAPrice(env: Env): Promise<string> {
 		return `Current Price of TSLA today is $${data.c.toFixed(4)} (USD)`;
 	} catch (err) {
 		return `Error making request: ${String(err)}`;
+	}
+}
+
+async function fetchKkDailyQuotaInterval(
+	productId: number,
+	startDate: string,
+	endDate: string,
+): Promise<KkDailyQuotaItem[]> {
+	const url = new URL(
+		"https://sp-api.terazglobal.com.my/api/v1/public/daily_quotas/interval/",
+	);
+	url.searchParams.set("product_id", String(productId));
+	url.searchParams.set("start_date", startDate);
+	url.searchParams.set("end_date", endDate);
+
+	const res = await fetch(url.toString());
+	if (!res.ok) {
+		throw new Error(`product ${productId} request failed (${res.status})`);
+	}
+
+	const data = (await res.json()) as unknown;
+	if (!Array.isArray(data)) {
+		throw new Error(`product ${productId} response is not an array`);
+	}
+
+	return data as KkDailyQuotaItem[];
+}
+
+function toProductStatusMessage(
+	productId: number,
+	rows: KkDailyQuotaItem[],
+): string {
+	if (rows.length === 0) {
+		return `Product ${productId}: no quota data returned`;
+	}
+
+	const productNameMap: Record<number, string> = {
+		1: "LEMAING HOSTEL",
+		2: "PANALABAN HOSTEL",
+	};
+	const productName = productNameMap[productId] ?? `Product ${productId}`;
+
+	const hasAvailability = rows.some((row) => row.available_quota > 0);
+	const overall = hasAvailability ? "AVAILABLE" : "FULLY BOOKED";
+	const titlePrefix = hasAvailability ? "🚨 " : "";
+
+	const dayLines = rows.map((row) => {
+		const dayStatus = row.available_quota > 0 ? "available" : "full";
+		return `${row.date}: ${dayStatus} (${row.available_quota}/${row.max_quota} left)`;
+	});
+
+	return [`${titlePrefix}${productName} - ${overall}`, ...dayLines].join("\n");
+}
+
+export async function getKkDailyQuotaAvailability(env: Env): Promise<string> {
+	void env;
+
+	const startDate = "2026-09-16";
+	const endDate = "2026-09-19";
+	const productIds = [1, 2];
+
+	try {
+		const results = await Promise.all(
+			productIds.map(async (productId) => {
+				const rows = await fetchKkDailyQuotaInterval(
+					productId,
+					startDate,
+					endDate,
+				);
+				return toProductStatusMessage(productId, rows);
+			}),
+		);
+
+		return [
+			`Daily KK quota availability (${startDate} to ${endDate})`,
+			"",
+			results.join("\n\n"),
+		].join("\n");
+	} catch (err) {
+		return `Error fetching daily quota availability: ${String(err)}`;
 	}
 }
