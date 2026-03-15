@@ -14,6 +14,7 @@ function createBot(env: Env): Bot {
 			return;
 		}
 
+		console.log("Received message from ", ctx.msg.chat.id, ctx.message.text);
 		await ctx.reply(ctx.message.text);
 	});
 
