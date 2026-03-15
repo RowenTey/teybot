@@ -1,3 +1,5 @@
 node_modules/
 .wrangler/
 *.vars
+channels.md
+cron_config.json
