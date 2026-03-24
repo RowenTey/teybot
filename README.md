@@ -13,10 +13,12 @@
   - `PUT /schedules/{id}`
   - `DELETE /schedules/{id}`
 - Cron-triggered scheduled dispatch (every minute)
-- Built-in scheduled tasks: `SGD_TO_MYR`, `TSLA_PRICE`
+- Built-in scheduled tasks: `SGD_TO_MYR`, `TSLA_PRICE`, `KK_DAILY_QUOTA_AVAILABILITY`, `DAILY_JOB_SUMMARY`
 - Health endpoints: `GET /` and `GET /health`
 - `/start` command reply
 - Default text echo for non-command messages
+- KK quota alerts send only when slots are available
+- Daily job run outcomes are persisted for summary reporting
 
 ## Setup
 
@@ -107,6 +109,8 @@ Example schedule request body:
 Notes:
 
 - If `task_name` is set, it overrides `message` at send time.
-- Supported task names: `SGD_TO_MYR`, `TSLA_PRICE`.
+- Supported task names: `SGD_TO_MYR`, `TSLA_PRICE`, `KK_DAILY_QUOTA_AVAILABILITY`, `DAILY_JOB_SUMMARY`.
 - Scheduler timezone is controlled by `SCHEDULE_TIMEZONE`.
 - Current `wrangler.toml` default is `Asia/Singapore`.
+- `KK_DAILY_QUOTA_AVAILABILITY` suppresses sends when no slots are available, but still records run status for daily summary.
+- Add one schedule with `task_name: DAILY_JOB_SUMMARY` at end of day (for example `59 23 * * *`) in your scheduler timezone to receive a daily digest.

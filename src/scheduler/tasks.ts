@@ -17,18 +17,38 @@ interface KkDailyQuotaItem {
 	id: number;
 }
 
-export type TaskHandler = (env: Env) => Promise<string>;
+export interface TaskResult {
+	text: string;
+	shouldSend?: boolean;
+	summary: string;
+}
+
+export type TaskHandler = (env: Env) => Promise<TaskResult>;
+
+function taskResult(
+	text: string,
+	summary: string,
+	shouldSend = true,
+): TaskResult {
+	return {
+		text,
+		summary,
+		shouldSend,
+	};
+}
 
 export const TaskMap: Record<string, TaskHandler> = {
 	SGD_TO_MYR: getExchangeRate,
 	TSLA_PRICE: getTSLAPrice,
 	KK_DAILY_QUOTA_AVAILABILITY: getKkDailyQuotaAvailability,
+	DAILY_JOB_SUMMARY: getDailyJobSummary,
 };
 
-export async function getExchangeRate(env: Env): Promise<string> {
+export async function getExchangeRate(env: Env): Promise<TaskResult> {
 	const apiKey = env.EXCHANGE_RATE_API_KEY;
 	if (!apiKey) {
-		return "EXCHANGE_RATE_API_KEY environment variable not set";
+		const text = "EXCHANGE_RATE_API_KEY environment variable not set";
+		return taskResult(text, "Missing EXCHANGE_RATE_API_KEY");
 	}
 
 	const url = `https://v6.exchangerate-api.com/v6/${apiKey}/latest/SGD`;
@@ -36,25 +56,30 @@ export async function getExchangeRate(env: Env): Promise<string> {
 	try {
 		const res = await fetch(url);
 		if (!res.ok) {
-			return `API request failed with status code: ${res.status}`;
+			const text = `API request failed with status code: ${res.status}`;
+			return taskResult(text, `Exchange rate API failed (${res.status})`);
 		}
 
 		const data = (await res.json()) as ExchangeRateResponse;
 		const sgdToMyr = data.conversion_rates?.MYR;
 		if (typeof sgdToMyr !== "number") {
-			return "MYR conversion rate not found";
+			const text = "MYR conversion rate not found";
+			return taskResult(text, "Exchange rate missing MYR value");
 		}
 
-		return `Conversion rates of SGD to MYR today is ${sgdToMyr.toFixed(4)}`;
+		const text = `Conversion rates of SGD to MYR today is ${sgdToMyr.toFixed(4)}`;
+		return taskResult(text, `SGD/MYR ${sgdToMyr.toFixed(4)}`);
 	} catch (err) {
-		return `Error making request: ${String(err)}`;
+		const text = `Error making request: ${String(err)}`;
+		return taskResult(text, "Exchange rate request failed");
 	}
 }
 
-export async function getTSLAPrice(env: Env): Promise<string> {
+export async function getTSLAPrice(env: Env): Promise<TaskResult> {
 	const apiKey = env.FINNHUB_API_KEY;
 	if (!apiKey) {
-		return "FINNHUB_API_KEY environment variable not set";
+		const text = "FINNHUB_API_KEY environment variable not set";
+		return taskResult(text, "Missing FINNHUB_API_KEY");
 	}
 
 	const url = `https://finnhub.io/api/v1/quote?symbol=TSLA&token=${apiKey}`;
@@ -62,17 +87,21 @@ export async function getTSLAPrice(env: Env): Promise<string> {
 	try {
 		const res = await fetch(url);
 		if (!res.ok) {
-			return `API request failed with status code: ${res.status}`;
+			const text = `API request failed with status code: ${res.status}`;
+			return taskResult(text, `TSLA API failed (${res.status})`);
 		}
 
 		const data = (await res.json()) as StockPriceResponse;
 		if (typeof data.c !== "number") {
-			return "TSLA price not available";
+			const text = "TSLA price not available";
+			return taskResult(text, "TSLA quote missing current price");
 		}
 
-		return `Current Price of TSLA today is $${data.c.toFixed(4)} (USD)`;
+		const text = `Current Price of TSLA today is $${data.c.toFixed(4)} (USD)`;
+		return taskResult(text, `TSLA $${data.c.toFixed(4)} (USD)`);
 	} catch (err) {
-		return `Error making request: ${String(err)}`;
+		const text = `Error making request: ${String(err)}`;
+		return taskResult(text, "TSLA quote request failed");
 	}
 }
 
@@ -104,16 +133,18 @@ async function fetchKkDailyQuotaInterval(
 function toProductStatusMessage(
 	productId: number,
 	rows: KkDailyQuotaItem[],
-): string {
-	if (rows.length === 0) {
-		return `Product ${productId}: no quota data returned`;
-	}
-
+): { text: string; hasAvailability: boolean } {
 	const productNameMap: Record<number, string> = {
 		1: "LEMAING HOSTEL",
 		2: "PANALABAN HOSTEL",
 	};
 	const productName = productNameMap[productId] ?? `Product ${productId}`;
+	if (rows.length === 0) {
+		return {
+			text: `${productName}: no quota data returned`,
+			hasAvailability: false,
+		};
+	}
 
 	const hasAvailability = rows.some((row) => row.available_quota > 0);
 	const overall = hasAvailability ? "AVAILABLE" : "FULLY BOOKED";
@@ -124,10 +155,15 @@ function toProductStatusMessage(
 		return `${row.date}: ${dayStatus} (${row.available_quota}/${row.max_quota} left)`;
 	});
 
-	return [`${titlePrefix}${productName} - ${overall}`, ...dayLines].join("\n");
+	return {
+		text: [`${titlePrefix}${productName} - ${overall}`, ...dayLines].join("\n"),
+		hasAvailability,
+	};
 }
 
-export async function getKkDailyQuotaAvailability(env: Env): Promise<string> {
+export async function getKkDailyQuotaAvailability(
+	env: Env,
+): Promise<TaskResult> {
 	void env;
 
 	const startDate = "2026-09-16";
@@ -145,13 +181,89 @@ export async function getKkDailyQuotaAvailability(env: Env): Promise<string> {
 				return toProductStatusMessage(productId, rows);
 			}),
 		);
-
-		return [
+		const hasAnyAvailability = results.some((result) => result.hasAvailability);
+		const text = [
 			`Daily KK quota availability (${startDate} to ${endDate})`,
 			"",
-			results.join("\n\n"),
+			results.map((result) => result.text).join("\n\n"),
 		].join("\n");
+
+		if (!hasAnyAvailability) {
+			return taskResult(
+				text,
+				`KK quota check ${startDate} to ${endDate}: no available slots`,
+				false,
+			);
+		}
+
+		return taskResult(
+			text,
+			`KK quota check ${startDate} to ${endDate}: slot available`,
+		);
 	} catch (err) {
-		return `Error fetching daily quota availability: ${String(err)}`;
+		const text = `Error fetching daily quota availability: ${String(err)}`;
+		return taskResult(text, "KK quota check failed", false);
 	}
+}
+
+function toLocalDate(date: Date, timeZone: string): string {
+	const dtf = new Intl.DateTimeFormat("en-CA", {
+		timeZone,
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit",
+	});
+
+	return dtf.format(date);
+}
+
+export async function getDailyJobSummary(env: Env): Promise<TaskResult> {
+	const timeZone = env.SCHEDULE_TIMEZONE || "Asia/Kuala_Lumpur";
+	const runDate = toLocalDate(new Date(), timeZone);
+	const rowsResult = await env.SCHEDULE_DB.prepare(
+		"SELECT schedule_id, description, task_name, status, was_sent, summary, executed_at FROM daily_job_runs WHERE run_date = ? AND IFNULL(task_name, '') != 'DAILY_JOB_SUMMARY' ORDER BY executed_at ASC",
+	)
+		.bind(runDate)
+		.all<Record<string, unknown>>();
+
+	const rows = rowsResult.results ?? [];
+	if (rows.length === 0) {
+		const text = `Daily job summary (${runDate}): no jobs executed.`;
+		return taskResult(text, `Daily summary ${runDate}: no jobs`, true);
+	}
+
+	let sent = 0;
+	let skipped = 0;
+	let failed = 0;
+
+	const details = rows.map((row) => {
+		const status = String(row.status ?? "unknown");
+		if (status === "sent") {
+			sent += 1;
+		} else if (status === "error") {
+			failed += 1;
+		} else {
+			skipped += 1;
+		}
+
+		const name =
+			(row.task_name && String(row.task_name)) ||
+			(row.description && String(row.description)) ||
+			String(row.schedule_id ?? "unknown");
+		const summary = String(row.summary ?? "No details");
+		return `- ${name}: ${status} (${summary})`;
+	});
+
+	const text = [
+		`Daily job summary (${runDate}, ${timeZone})`,
+		`Total: ${rows.length} | Sent: ${sent} | Skipped: ${skipped} | Failed: ${failed}`,
+		"",
+		details.join("\n"),
+	].join("\n");
+
+	return taskResult(
+		text,
+		`Daily summary ${runDate}: ${rows.length} jobs (sent ${sent}, skipped ${skipped}, failed ${failed})`,
+		true,
+	);
 }
