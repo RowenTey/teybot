@@ -38,13 +38,14 @@ function taskResult(
 }
 
 export const TaskMap: Record<string, TaskHandler> = {
-	SGD_TO_MYR: getExchangeRate,
+	SGD_TO_MYR: getSgdToMyr,
+	JPY_TO_MYR: getJpyToMyr,
 	TSLA_PRICE: getTSLAPrice,
 	KK_DAILY_QUOTA_AVAILABILITY: getKkDailyQuotaAvailability,
 	DAILY_JOB_SUMMARY: getDailyJobSummary,
 };
 
-export async function getExchangeRate(env: Env): Promise<TaskResult> {
+export async function getSgdToMyr(env: Env): Promise<TaskResult> {
 	const apiKey = env.EXCHANGE_RATE_API_KEY;
 	if (!apiKey) {
 		const text = "EXCHANGE_RATE_API_KEY environment variable not set";
@@ -69,6 +70,37 @@ export async function getExchangeRate(env: Env): Promise<TaskResult> {
 
 		const text = `Conversion rates of SGD to MYR today is ${sgdToMyr.toFixed(4)}`;
 		return taskResult(text, `SGD/MYR ${sgdToMyr.toFixed(4)}`);
+	} catch (err) {
+		const text = `Error making request: ${String(err)}`;
+		return taskResult(text, "Exchange rate request failed");
+	}
+}
+
+export async function getJpyToMyr(env: Env): Promise<TaskResult> {
+	const apiKey = env.EXCHANGE_RATE_API_KEY;
+	if (!apiKey) {
+		const text = "EXCHANGE_RATE_API_KEY environment variable not set";
+		return taskResult(text, "Missing EXCHANGE_RATE_API_KEY");
+	}
+
+	const url = `https://v6.exchangerate-api.com/v6/${apiKey}/latest/JPY`;
+
+	try {
+		const res = await fetch(url);
+		if (!res.ok) {
+			const text = `API request failed with status code: ${res.status}`;
+			return taskResult(text, `Exchange rate API failed (${res.status})`);
+		}
+
+		const data = (await res.json()) as ExchangeRateResponse;
+		const jpyToMyr = data.conversion_rates?.MYR;
+		if (typeof jpyToMyr !== "number") {
+			const text = "MYR conversion rate not found";
+			return taskResult(text, "Exchange rate missing MYR value");
+		}
+
+		const text = `Conversion rates of JPY to MYR today is ${jpyToMyr.toFixed(4)}`;
+		return taskResult(text, `JPY/MYR ${jpyToMyr.toFixed(4)}`);
 	} catch (err) {
 		const text = `Error making request: ${String(err)}`;
 		return taskResult(text, "Exchange rate request failed");
